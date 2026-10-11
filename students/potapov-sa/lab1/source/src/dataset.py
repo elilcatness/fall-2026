@@ -1,25 +1,37 @@
 import os
-from typing import Optional
+from typing import Optional, Literal
 from io import StringIO
 
 import pandas as pd
 import numpy as np
-# from kagglehub import dataset_download
 
 from .constants import *
 
 
+DSType = Literal['train', 'test']
+
+
 class PandasWrapper:
     _df: pd.DataFrame
-    name: Optional[str]
+    _type: Optional[DSType]
+    _name: Optional[str]
 
-    def __init__(self, name: Optional[str] = None):
-        self.name = name
+    def __init__(self, type_: Optional[DSType] = None, name: Optional[str] = None):
+        self._type = type_
+        self._name = (': '.join([name, type_]) if type_ is not None else name) if name is not None else None
 
     def info(self) -> None:
         if self.name is not None:
             print(self.name)
         self._df.info()
+
+    @property
+    def type(self) -> Optional[DSType]:
+        return self._type
+
+    @property
+    def name(self) -> Optional[str]:
+        return self._name
 
     def __str__(self) -> str:
         buf = StringIO()
@@ -40,20 +52,24 @@ class DataSet(PandasWrapper):
 
     @staticmethod
     def _load_dataset() -> pd.DataFrame:
-        path = '~/.cache/kagglehub/datasets/mssmartypants/water-quality/versions/3'
+        path = '~/.cache/kagglehub/datasets/mayurdalvi/sonar-mine-dataset/versions/1'
         return pd.read_csv(os.path.join(path, DATASET_FILENAME))
 
     @staticmethod
-    def _remove_num_err_with_zero(df: pd.DataFrame, *cols: str) -> pd.DataFrame:
-        for col in cols:
-            df = df[df[col] != '#NUM!']
+    def _scale_dataset(df: pd.DataFrame) -> pd.DataFrame:
+        for col in df.columns:
+            min_ = df[col].min()
+            df[col] = (df[col] - min_) / (df[col].max() - min_)
         return df
 
     def _prepare_dataset(self, target: str) -> pd.DataFrame:
         df = self._load_dataset()
-        df = self._remove_num_err_with_zero(df, 'ammonia', target)
-        df = df.astype({target: np.int16, 'ammonia': np.float64})
+        df[target] = df[target] == 'M'
+        df = df.astype({target: np.int16})
         df[target] -= 1 - df[target]
+        cols_wo_target = df.columns.drop(target)
+        df[cols_wo_target] = self._scale_dataset(df[cols_wo_target])
+
         return df
 
     def _train_test_split(self, target: str, ratio: float) -> tuple[DataSample, DataSample]:
@@ -62,8 +78,8 @@ class DataSet(PandasWrapper):
         train_sample.reset_index(drop=True)
         test_sample.reset_index(drop=True)
         return (
-            DataSample(train_sample, target, dataset_name=self.name, name='train'),
-            DataSample(test_sample, target, dataset_name=self.name, name='test')
+            DataSample(train_sample, target, dataset_name=self.name, type_='train'),
+            DataSample(test_sample, target, dataset_name=self.name, type_='test')
         )
 
     @property
@@ -80,13 +96,10 @@ class DataSample(PandasWrapper):
             self,
             df: pd.DataFrame,
             target: str,
-            dataset_name: Optional[str] = None,
-            name: Optional[str] = None
+            type_: Literal['train', 'test'],
+            dataset_name: Optional[str] = None
     ):
-        self.short_name = name
-        if dataset_name is not None and name is not None:
-            name = ': '.join([dataset_name, name])
-        super().__init__(name=name)
+        super().__init__(type_=type_, name=dataset_name)
         self._df = df
         self._X = df.drop([target], axis=1)
         self._X_1 = self._X.copy()
@@ -94,7 +107,6 @@ class DataSample(PandasWrapper):
             raise Exception('Invalid dataset column name: "dummy"')
         self._X_1['dummy'] = 1
         self._Y = df[target]
-        self.name = name
 
     @property
     def X(self) -> pd.DataFrame:
@@ -107,9 +119,6 @@ class DataSample(PandasWrapper):
     @property
     def Y(self) -> pd.Series:
         return self._Y
-
-    def get_name(self, explicit: bool = False) -> Optional[str]:
-        return self.name if explicit else self.short_name
 
 
 __all__ = ['DataSet', 'DataSample']
