@@ -11,7 +11,8 @@ class Model(ABC):
     _margins: Optional[np.ndarray]
     _metrics: Metrics
 
-    def __init__(self):
+    def __init__(self, name: Optional[str] = None):
+        self._name = name
         self._metrics = Metrics()
         self._margins = None
 
@@ -44,6 +45,17 @@ class Model(ABC):
         self._margins = self.calc_margins_sample(sample)
         self._metrics.measure(self, sample)
         return self._metrics
+
+    def save(self, filename: Optional[str] = None):
+        self.weights.tofile(
+            filename if filename else
+            self.name if self.name else
+            self.__class__.__name__
+        )
+
+    @property
+    def name(self) -> str:
+        return self._name if self._name else self.__class__.__name__
 
     @property
     def margins(self) -> Optional[np.ndarray]:

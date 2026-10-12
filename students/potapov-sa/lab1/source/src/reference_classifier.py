@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -10,9 +10,9 @@ from .dataset import DataSample
 from .model import Model
 
 class ReferenceSGDClassifier(Model):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__()
-        self._clf = SGDClassifier(*args, **kwargs)
+    def __init__(self, *args: Any, name: Optional[str] = None, **kwargs: Any) -> None:
+        super().__init__(name=name)
+        self._clf = SGDClassifier(*args, **kwargs, loss='squared_hinge', penalty='l2')
 
     def _fit_impl(self, sample: DataSample, **kwargs: Any) -> None:
         self._clf.fit(sample.X, sample.Y, **kwargs)

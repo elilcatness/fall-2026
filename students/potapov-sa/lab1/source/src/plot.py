@@ -7,6 +7,24 @@ from matplotlib import pyplot as plt
 from .model import Model
 from .dataset import DataSample
 
+_SAVE_FIG_DPI = 200
+
+
+def _get_savefig_path(filename: str, folder: str = 'img', ext: str = 'png') -> str:
+    if not folder:
+        folder = '.'
+    if not ext:
+        ext = 'png'
+    if ext.startswith('.'):
+        ext = ext.lstrip('.')
+    
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+    if not filename.endswith(f'.{ext}'):
+        filename = f'{filename}.{ext}'
+
+    return os.path.join(folder, filename)
+
 
 def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = None):
     margins = model.margins if model.margins is not None else model.calc_margins_sample(sample)
@@ -34,22 +52,14 @@ def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = Non
         sorted_margins[-1] + round(m_delta * 0.05)
     ])
 
-    # plt.xticks(np.linspace(plot_x[0], plot_x[-1] + 1, x_delta // 20))
-    # plt.yticks(np.linspace(sorted_margins[0], sorted_margins[-1], x_delta // 20))
-    # plt.minorticks_on()
-
     if filename:
-        if not os.path.exists('img'):
-            os.mkdir('img')
-        if not filename.endswith('.png'):
-            filename = f'{filename}.png'
-        plt.savefig(os.path.join('img', filename))
+        plt.savefig(_get_savefig_path(filename), dpi=_SAVE_FIG_DPI)
     else:
         plt.show()
     plt.close()
 
 
-def plot_metrics(data: dict[str, dict[str, list[float]]]) -> None:
+def plot_metrics(data: dict[str, dict[str, list[float]]], save_images: bool = True) -> None:
     for metric_name, model_data in data.items():
         for model_name, metric_values in model_data.items():
             plt.plot(
@@ -59,5 +69,10 @@ def plot_metrics(data: dict[str, dict[str, list[float]]]) -> None:
             )
         plt.title(metric_name)
         plt.legend()
-        plt.show()
+
+        if save_images:
+            plt.savefig(_get_savefig_path(metric_name), dpi=_SAVE_FIG_DPI)
+        else:
+            plt.show()
+
         plt.close()

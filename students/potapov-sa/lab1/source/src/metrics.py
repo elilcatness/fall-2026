@@ -31,6 +31,7 @@ class SampleMetrics:
     sample_type: Optional[DSType]
     accuracy: float
     precision: float
+    recall: float
 
     @staticmethod
     def from_model(model: Model, sample: DataSample) -> SampleMetrics:
@@ -39,14 +40,16 @@ class SampleMetrics:
         return SampleMetrics(
             sample_name=sample.name,
             sample_type=sample.type,
-            accuracy=(tp + tn) / (tp + tn + fp + fn),
-            precision=tp / (tp + fp) if tp + fp != 0 else 0
+            accuracy=(tp + tn) / denum if (denum := tp + tn + fp + fn) != 0 else 0,
+            precision=tp / denum if (denum := tp + fp) != 0 else 0,
+            recall=tp / (tp + fn) if (denum := tp + fn) != 0 else 0
         )
 
     def to_dict(self) -> dict[str, float]:
         return {
             'Accuracy': self.accuracy,
-            'Precision': self.precision
+            'Precision': self.precision,
+            'Recall': self.recall
         }
 
     def __str__(self) -> str:
@@ -58,7 +61,8 @@ class SampleMetrics:
             title +
             [
                 f'Accuracy: {self.accuracy}',
-                f'Precision: {self.precision}'
+                f'Precision: {self.precision}',
+                f'Recall: {self.recall}'
             ]
         )
 

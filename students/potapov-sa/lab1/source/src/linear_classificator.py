@@ -13,6 +13,7 @@ class LinearClassificator(Model):
     def __init__(
             self,
             feature_count: int,
+            name: Optional[str] = None,
             initial_weights: Optional[np.ndarray] = None,
             init_weights_method: Literal['random', 'corr'] = 'random',
             corr_sample: Optional[DataSample] = None,
@@ -24,7 +25,7 @@ class LinearClassificator(Model):
             regularization_rate: float = 10e-3,
             epsilon: float = 10e-5,
         ):
-        super().__init__()
+        super().__init__(name=name)
 
         self.feature_count = feature_count
         self._weights: np.ndarray = (
@@ -53,8 +54,8 @@ class LinearClassificator(Model):
     def _init_weights(self, method: str, corr_sample: Optional[DataSample] = None) -> np.ndarray:
         if method == 'random':
             return np.random.uniform(
-                -(1 / (2 * self.feature_count - 1)),
-                1 / (2 * self.feature_count - 1),
+                -(1 / (2 * self.feature_count)),
+                1 / (2 * self.feature_count),
                 self.feature_count
             )
         if method == 'corr':
@@ -64,7 +65,7 @@ class LinearClassificator(Model):
                 )
             X, Y = corr_sample.X_1.to_numpy(), corr_sample.Y.to_numpy()
             return np.array(
-                [np.dot(Y, X[:, j]) / np.sum(X[:, j] ** 2) for j in range(self.feature_count)]
+                [np.dot(Y, X[:, j]) / np.sum(X[:, j] ** 2) for j in range(self.feature_count)] # type: ignore
             )
         raise NotImplementedError
 
@@ -161,9 +162,6 @@ class LinearClassificator(Model):
     
     def predict(self, sample: DataSample) -> np.ndarray:
         return np.array([1 if y_pred >= 0 else -1 for y_pred in self._weights @ sample.X_1.T])
-
-    def save(self, filename: str):
-        self._weights.tofile(filename)
 
     @property
     def weights(self) -> np.ndarray:
