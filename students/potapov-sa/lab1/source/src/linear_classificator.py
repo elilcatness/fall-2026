@@ -110,12 +110,12 @@ class LinearClassificator(Model):
         sub_Y.reset_index()
         return sub_X.to_numpy(), sub_Y.to_numpy()
 
-    def update_weights_nag(self, v: np.float64, x: np.ndarray, y: np.ndarray) -> np.float64:
+    def update_weights_nag(self, v: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         h = 1 / np.sum(x ** 2) ** 2 # steepest decent
         nag_weights = self._weights - h * self.gamma * v
         m = self.calc_margins(x, y, weights=nag_weights)
         grad = (-2 * y * (1 - m)) @ x
-        v = (self.gamma * v + (1 - self.gamma) * grad)[0]
+        v = self.gamma * v + (1 - self.gamma) * grad
         self._weights = self._weights * (1 - h * self.tao) - h * v
         return v
 
@@ -132,14 +132,14 @@ class LinearClassificator(Model):
         x, y = X[batch_rand_idx], Y[batch_rand_idx]
         return x, y
 
-    def sgd(self, sample: DataSample, batch_size: int = 16):
+    def sgd(self, sample: DataSample):
         X, Y = sample.X_1.to_numpy(), sample.Y.to_numpy()
 
         q = np.mean(self.loss(*self._get_subsample(sample)))
         delta_q = float('inf')
 
         # NAG
-        v = np.float64(0)
+        v = np.zeros(self.feature_count)
         
         i = 0
         while delta_q > self.epsilon:

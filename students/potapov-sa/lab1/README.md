@@ -24,9 +24,8 @@ Name: count, dtype: int64
 
 - В качестве положительного класса была взята отметка `M`, в качестве отрицательного - `R`
 - Значения 0 и 1 были преобразованы в 1 и -1
-- Была произведена min-max нормализация всех признаков, кроме таргета
 
-Метод подготовки датасета: [src/dataset.py:65](source/src/dataset.py#L65)
+Метод подготовки датасета ([src/dataset.py:61](source/src/dataset.py#L61)):
 ```py
 def _prepare_dataset(self, target: str) -> pd.DataFrame:
     df = self._load_dataset()
@@ -34,8 +33,17 @@ def _prepare_dataset(self, target: str) -> pd.DataFrame:
     df = df.astype({target: np.int16})
     df[target] -= 1 - df[target]
     cols_wo_target = df.columns.drop(target)
-    df[cols_wo_target] = self._scale_dataset(df[cols_wo_target])
+    return df
+```
 
+Также для каждой выборки (`train` и `test`) была произведена `min-max` нормализация всех признаков, кроме таргета ([src/dataset.py:104](source/src/dataset.py#L104)):
+```py
+def _scale(self, df: pd.DataFrame, *ignore: str) -> pd.DataFrame:
+    for col in df.columns:
+        if col in ignore:
+            continue
+        min_ = df[col].min()
+        df[col] = (df[col] - min_) / (df[col].max() - min_)
     return df
 ```
 
@@ -57,13 +65,9 @@ def _prepare_dataset(self, target: str) -> pd.DataFrame:
 
 ### 2.2 Отступы модели со случайной инициализацией весов через мультистарт (далее - `multistart`)
 
-График показывает плохую линейную разделимость. Отступы всех объектов являются неуверенными (находятся в окрестности нуля).
-
 ![multistart-margins](source/report_img/multistart.png)
 
 ### 2.3 Отступы модели со случайным предъявлением объектов (далее - `shuffling`)
-
-График показывает плохую линейную разделимость. Отступы всех объектов являются неуверенными (находятся в окрестности нуля).
 
 ![shuffling-margins](source/report_img/shuffling.png)
 
@@ -191,12 +195,12 @@ $$
 
 Реализация в коде ([src/linear_classificator.py:113](source/src/linear_classificator.py#L113)):
 ```py
-def update_weights_nag(self, v: np.float64, x: np.ndarray, y: np.ndarray) -> np.float64:
+def update_weights_nag(self, v: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     h = 1 / np.sum(x ** 2) ** 2 # steepest decent
     nag_weights = self._weights - h * self.gamma * v
     m = self.calc_margins(x, y, weights=nag_weights)
     grad = (-2 * y * (1 - m)) @ x
-    v = (self.gamma * v + (1 - self.gamma) * grad)[0]
+    v = (self.gamma * v + (1 - self.gamma) * grad)
     self._weights = self._weights * (1 - h * self.tao) - h * v
     return v
 ```
@@ -317,8 +321,8 @@ def solution_corr(
 ```plaintext
 corr metrics:
        Accuracy  Precision    Recall
-train  0.751724   0.729412  0.826667
-test   0.822581   0.837838  0.861111
+train  0.758621   0.850746  0.695122
+test   0.854839   0.916667  0.758621
 ```
 
 ### 9.2 Обучение со случайной инициализацией весов через мультистарт (модель `multistart`)
@@ -368,8 +372,8 @@ def solution_multistart(
 ```plaintext
 multistart metrics:
        Accuracy  Precision    Recall
-train  0.696552   0.714286  0.750000
-test   0.741935   0.727273  0.774194
+train  0.793103   0.809524  0.829268
+test   0.903226   0.925926  0.862069
 ```
 
 ### 9.3 Обучение со случайным предъявлением (модель `shuffling`)
@@ -408,9 +412,9 @@ def solution_shuffling(
 
 ```plaintext
 shuffling metrics:
-       Accuracy  Precision  Recall
-train  0.475862   0.475862     1.0
-test   0.677419   0.677419     1.0
+       Accuracy  Precision    Recall
+train  0.813793   0.772727  0.906667
+test   0.854839   0.885714  0.861111
 ```
 
 ### 9.4 Обучение с предъявлением объектов по модулю отступа (модель `unsure_margin`)
@@ -438,9 +442,9 @@ def solution_unsure_margin(
 **Метрики**
 ```plaintext
 unsure_margin metrics:
-       Accuracy  Precision  Recall
-train  0.462069   0.462069     1.0
-test   0.709677   0.709677     1.0
+       Accuracy  Precision    Recall
+train  0.882759   0.862500  0.920000
+test   0.854839   0.935484  0.805556
 ```
 
 ### 9.5 Эталонная реализация (модель `ref`)
@@ -467,8 +471,8 @@ def solution_reference(
 ```plaintext
 ref metrics:
        Accuracy  Precision    Recall
-train  0.834483   0.757895  0.986301
-test   0.870968   0.857143  0.947368
+train  0.868966   0.858974  0.893333
+test   0.870968   0.937500  0.833333
 ```
 
 ## 10. Оценка качества классификации
@@ -479,18 +483,18 @@ test   0.870968   0.857143  0.947368
 ```plaintext
 Best metrics:
                Accuracy  Precision    Recall
-ref            0.870968   0.857143  0.947368
-corr           0.822581   0.837838  0.861111
-multistart     0.741935   0.727273  0.774194
-unsure_margin  0.709677   0.709677  1.000000
-shuffling      0.677419   0.677419  1.000000
+multistart     0.903226   0.925926  0.862069
+ref            0.870968   0.937500  0.833333
+corr           0.854839   0.916667  0.758621
+shuffling      0.854839   0.885714  0.861111
+unsure_margin  0.854839   0.935484  0.805556
 ```
 
-Таким образом, из самописных реализаций лучшей оказалась модель с инициализацией весов через корреляцию (`corr`).
+Таким образом, из самописных реализаций лучшей оказалась модель с инициализацией весов через корреляцию (`multstart`).
 
 ### 10.2 Графики метрик
 
-По графикам можно увидеть, что наилучшая самописная реализация `corr` в целом приближена к результатам эталонной реализации `ref`.
+По графикам можно увидеть, что наилучшая самописная реализация `multistart` показала себя лучше, чем эталонная реализация `ref`.
 
 #### 10.2.1 Accuracy
 
@@ -506,8 +510,8 @@ shuffling      0.677419   0.677419  1.000000
 
 ## 11. Сравнение лучшей реализации с эталонной
 
-Эталонная реализация `ref` оказалась лучше самописной `corr`:
+По `accuracy` и `recall` самописная реализация `multistart` оказалась лучше эталонной реализации `ref`:
 
-- По `accuracy`: на 5.9%
-- По `precision`: на 2.3%
-- По `recall`: на 10%
+- По `accuracy`: самописная на 3.7% лучше эталонной
+- По `precision`: эталонная на 1.2% лучше самописной
+- По `recall`: самописная на 3.4% лучше эталонной

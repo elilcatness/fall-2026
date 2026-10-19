@@ -1,6 +1,6 @@
-import os
 from typing import Optional, Literal
 from io import StringIO
+from kagglehub import load_dataset, KaggleDatasetAdapter
 
 import pandas as pd
 import numpy as np
@@ -52,24 +52,17 @@ class DataSet(PandasWrapper):
 
     @staticmethod
     def _load_dataset() -> pd.DataFrame:
-        path = '~/.cache/kagglehub/datasets/mayurdalvi/sonar-mine-dataset/versions/1'
-        return pd.read_csv(os.path.join(path, DATASET_FILENAME))
-
-    @staticmethod
-    def _scale_dataset(df: pd.DataFrame) -> pd.DataFrame:
-        for col in df.columns:
-            min_ = df[col].min()
-            df[col] = (df[col] - min_) / (df[col].max() - min_)
-        return df
+        return load_dataset(
+            KaggleDatasetAdapter.PANDAS,
+            'mayurdalvi/sonar-mine-dataset',
+            'sonar data.csv'
+        )
 
     def _prepare_dataset(self, target: str) -> pd.DataFrame:
         df = self._load_dataset()
         df[target] = df[target] == 'M'
         df = df.astype({target: np.int16})
         df[target] -= 1 - df[target]
-        cols_wo_target = df.columns.drop(target)
-        df[cols_wo_target] = self._scale_dataset(df[cols_wo_target])
-
         return df
 
     def _train_test_split(self, target: str, ratio: float) -> tuple[DataSample, DataSample]:
@@ -100,13 +93,21 @@ class DataSample(PandasWrapper):
             dataset_name: Optional[str] = None
     ):
         super().__init__(type_=type_, name=dataset_name)
-        self._df = df
-        self._X = df.drop([target], axis=1)
+        self._df = self._scale(df, target)
+        self._X = self._df.drop([target], axis=1)
         self._X_1 = self._X.copy()
         if 'dummy' in self._X_1.columns:
             raise Exception('Invalid dataset column name: "dummy"')
         self._X_1['dummy'] = 1
         self._Y = df[target]
+
+    def _scale(self, df: pd.DataFrame, *ignore: str) -> pd.DataFrame:
+        for col in df.columns:
+            if col in ignore:
+                continue
+            min_ = df[col].min()
+            df[col] = (df[col] - min_) / (df[col].max() - min_)
+        return df
 
     @property
     def X(self) -> pd.DataFrame:

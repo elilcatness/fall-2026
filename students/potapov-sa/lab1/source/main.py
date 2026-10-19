@@ -1,13 +1,14 @@
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 from src.model import Model
 from src.dataset import DataSet, DataSample
 from src.linear_classificator import LinearClassificator
 from src.plot import plot_margins, plot_metrics
-from src.constants import DATASET_TARGET
 from src.reference_classifier import ReferenceSGDClassifier
+from src.constants import RANDOM_STATE
 
 
 def solution_corr(
@@ -174,14 +175,6 @@ def main():
         print_model_metrics(model)
 
 
-def tmp():
-    ds = DataSet()
-    df = ds.df
-    df.info()
-    print(df[DATASET_TARGET].value_counts())
-
-
 if __name__ == '__main__':
-    # np.random.seed(RANDOM_STATE)
-    # main()
-    tmp()
+    np.random.seed(RANDOM_STATE)
+    main()
