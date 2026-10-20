@@ -5,17 +5,19 @@ import pandas as pd
 
 from sklearn.linear_model import SGDClassifier
 
-from .dataset import DataSample
+from .dataset import DataSample, DataSet
 
 from .model import Model
 
 class ReferenceSGDClassifier(Model):
+    _loss_history_is_loggable = False
+
     def __init__(self, *args: Any, name: Optional[str] = None, **kwargs: Any) -> None:
         super().__init__(name=name)
         self._clf = SGDClassifier(*args, **kwargs, loss='squared_hinge', penalty='l2')
 
-    def _fit_impl(self, sample: DataSample, **kwargs: Any) -> None:
-        self._clf.fit(sample.X, sample.Y, **kwargs)
+    def _fit_impl(self, ds: DataSet, **kwargs: Any) -> None:
+        self._clf.fit(ds.train.X, ds.train.Y, **kwargs)
     
     def predict(self, sample: DataSample):
         return self._clf.predict(sample.X)

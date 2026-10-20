@@ -6,7 +6,7 @@ import pandas as pd
 from src.model import Model
 from src.dataset import DataSet, DataSample
 from src.linear_classificator import LinearClassificator
-from src.plot import plot_margins, plot_metrics
+from src.plot import plot_loss_history, plot_margins
 from src.reference_classifier import ReferenceSGDClassifier
 from src.constants import RANDOM_STATE
 
@@ -21,10 +21,11 @@ def solution_corr(
         init_weights_method='corr',
         corr_sample=ds.train
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'corr')
+        plot_loss_history(model)
     return model, ds.test
 
 
@@ -40,7 +41,7 @@ def solution_multistart(
             name='multistart',
             init_weights_method='random'
         )
-        model.fit(ds.train)
+        model.fit(ds)
         model.evaluate(ds.test)
         if (
             best_model is None or
@@ -61,7 +62,7 @@ def solution_shuffling(
         name='shuffling',
         object_selection_method='shuffling'
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'shuffling')
@@ -77,7 +78,7 @@ def solution_unsure_margin(
         name='unsure_margin',
         object_selection_method='unsure_first'
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'unsure_margin.png')
@@ -89,7 +90,7 @@ def solution_reference(
         plot: bool = False
 ) -> tuple[ReferenceSGDClassifier, DataSample]:
     model = ReferenceSGDClassifier(name='ref')
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'ref')
@@ -123,7 +124,7 @@ def print_models_metrics(*models: Model) -> None:
 
 
 def main():
-    N = 100
+    N = 1
     print(f'N = {N}')
 
     best_models: dict[
@@ -137,7 +138,7 @@ def main():
         'Accuracy': {},
         'Precision': {},
         'Recall': {}
-    }
+    }    
 
     for i in range(1, N + 1):
         ds = DataSet()
@@ -166,12 +167,10 @@ def main():
     print('\n\nBest metrics:')
     print_models_metrics(*[model_tuple[0] for model_tuple in best_models.values()])
 
-    plot_metrics(metrics_data)
-
     for model, model_ds in best_models.values():
-        model.save()
         plot_margins(model, model_ds, filename=model.name)
-        print()
+        if model._loss_history_is_loggable:
+            plot_loss_history(model)
         print_model_metrics(model)
 
 

@@ -29,7 +29,7 @@ def _get_savefig_path(filename: str, folder: str = 'img', ext: str = 'png') -> s
 def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = None):
     margins = model.margins if model.margins is not None else model.calc_margins_sample(sample)
     sorted_margins: list[np.float64] = sorted(list(margins))
-    plot_x = np.array([i for i in range(0, len(sorted_margins))])
+    plot_x = np.array([i for i in range(len(sorted_margins))])
 
     for x, m in zip(plot_x, sorted_margins):
         if m <= -0.3:
@@ -52,6 +52,10 @@ def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = Non
         sorted_margins[-1] + round(m_delta * 0.05)
     ])
 
+    plt.title('Sorted margins')
+    plt.xlabel('i')
+    plt.ylabel('margin')
+
     if filename:
         plt.savefig(_get_savefig_path(filename), dpi=_SAVE_FIG_DPI)
     else:
@@ -59,20 +63,24 @@ def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = Non
     plt.close()
 
 
-def plot_metrics(data: dict[str, dict[str, list[float]]], save_images: bool = True) -> None:
-    for metric_name, model_data in data.items():
-        for model_name, metric_values in model_data.items():
-            plt.plot(
-                range(1, len(metric_values) + 1),
-                metric_values,
-                label=model_name
-            )
-        plt.title(metric_name)
-        plt.legend()
+def plot_loss_history(model: Model, save_image: bool = True):
+    if model.loss_history is None:
+        raise Exception('Model must have loss history to plot it')
+    train_history, test_history = model.loss_history.train, model.loss_history.test
 
-        if save_images:
-            plt.savefig(_get_savefig_path(metric_name), dpi=_SAVE_FIG_DPI)
-        else:
-            plt.show()
-
-        plt.close()
+    if len(train_history) * len(test_history) == 0:
+        raise Exception('Both train_history and test_history must be not empty')
+    
+    plt.plot(range(len(train_history)), train_history, label='train')
+    plt.plot(range(len(test_history)), test_history, label='test')
+    
+    plt.xlabel('iter')
+    plt.ylabel('loss')
+    plt.title(f'{(model.name + ' ') if model.name else ''}Loss')
+    
+    plt.legend()
+    if save_image:
+        plt.savefig(_get_savefig_path(f'{model.name}_loss'), dpi=_SAVE_FIG_DPI)
+    else:
+        plt.show()
+    plt.close()

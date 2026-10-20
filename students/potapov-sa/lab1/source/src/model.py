@@ -1,20 +1,30 @@
+from dataclasses import dataclass
 from typing import Optional, Any
 from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .dataset import DataSample
+from .dataset import DataSample, DataSet
 from .metrics import Metrics, SampleMetrics
+
+
+@dataclass
+class LossHistory:
+    train: np.ndarray
+    test: np.ndarray
 
 
 class Model(ABC):
     _margins: Optional[np.ndarray]
     _metrics: Metrics
+    _loss_history: Optional[LossHistory]
+    _loss_history_is_loggable: bool = True
 
     def __init__(self, name: Optional[str] = None):
         self._name = name
         self._metrics = Metrics()
         self._margins = None
+        self._loss_history = None
 
     def calc_margins_sample(
             self,
@@ -36,10 +46,19 @@ class Model(ABC):
     def measure_metrics(self, sample: DataSample, inplace: bool = True) -> SampleMetrics:
         return self._metrics.measure(self, sample, inplace=inplace)
 
-    def fit(self, sample: DataSample, evaluate: bool = True, **kwargs: Any) -> None:
-        self._fit_impl(sample, **kwargs)
+    def fit(
+        self, ds: DataSet, history: bool = True, evaluate: bool = True, **kwargs: Any
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        if self._loss_history_is_loggable:
+            kwargs['history'] = history
+        else:
+            history = False
+        fit_res = self._fit_impl(ds, **kwargs)
         if evaluate:
-            self.evaluate(sample)
+            self.evaluate(ds.train)
+        if history:
+            self._loss_history = LossHistory(*fit_res) # type: ignore
+        return fit_res
 
     def evaluate(self, sample: DataSample) -> Metrics:
         self._margins = self.calc_margins_sample(sample)
@@ -65,9 +84,19 @@ class Model(ABC):
     def metrics(self) -> Metrics:
         return self._metrics
 
+    @property
+    def loss_history(self) -> Optional[LossHistory]:
+        return self._loss_history
+
+    @property
+    def loss_history_is_loggable(self) -> bool:
+        return self._loss_history_is_loggable
+
     # Abstract methods
     @abstractmethod
-    def _fit_impl(self, sample: DataSample, **kwargs: Any) -> None:
+    def _fit_impl(
+        self, ds: DataSet, **kwargs: Any
+    ) -> tuple[np.ndarray, np.ndarray] | None:
         pass
 
     @abstractmethod

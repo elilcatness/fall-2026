@@ -4,12 +4,14 @@ import numpy as np
 import pandas as pd
 
 from .model import Model
-from .dataset import DataSample
+from .dataset import DataSample, DataSet
 from .exceptions import InitializationException
 from .constants import RANDOM_STATE
 
 
 class LinearClassificator(Model):
+    _loss_history_is_loggable = True
+
     def __init__(
             self,
             feature_count: int,
@@ -45,7 +47,7 @@ class LinearClassificator(Model):
         self.shuffling_i = 0
 
     @staticmethod
-    def from_file(path: str) -> LinearClassificator:
+    def from_file(path: str) -> 'LinearClassificator':
         weights = np.fromfile(path)
         if len(weights.shape) > 1 or len(weights) < 1:
             raise InitializationException('Weights must be a non-null vector')
@@ -132,33 +134,48 @@ class LinearClassificator(Model):
         x, y = X[batch_rand_idx], Y[batch_rand_idx]
         return x, y
 
-    def sgd(self, sample: DataSample):
-        X, Y = sample.X_1.to_numpy(), sample.Y.to_numpy()
+    def sgd(self, ds: DataSet, history: bool = False) -> tuple[np.ndarray, np.ndarray] | None:
+        train_history: list[np.float64] = []
+        test_history: list[np.float64] = []
 
-        q = np.mean(self.loss(*self._get_subsample(sample)))
+        def _log_history():
+            train_history.append(q)
+            test_history.append(np.mean(self.loss(X_test, Y_test)))
+
+        X_train, Y_train = ds.train.X_1.to_numpy(), ds.train.Y.to_numpy()
+        X_test, Y_test = ds.test.X_1.to_numpy(), ds.test.Y.to_numpy()
+
+        q = np.mean(self.loss(*self._get_subsample(ds.train)))
         delta_q = float('inf')
 
         # NAG
         v = np.zeros(self.feature_count)
-        
-        i = 0
-        while delta_q > self.epsilon:
-            i += 1
 
-            x, y = self.select_object(X, Y)
+        train_history: list[np.float64] = []
+        test_history: list[np.float64] = [] 
+        while delta_q > self.epsilon:
+            x, y = self.select_object(X_train, Y_train)
 
             m = self.calc_margins(x, y)
             xi = self.loss_margin(m)
 
             v = self.update_weights_nag(v, x, y)
 
-            new_q = self.lmbd * xi + (1 - self.lmbd) * q
-            # print(f'{i}. Q: {new_q}')
+            new_q = (self.lmbd * xi + (1 - self.lmbd) * q)[0] # new_q is a scalar
             delta_q = abs(q - new_q)
-            q = new_q  
 
-    def _fit_impl(self, sample: DataSample, **kwargs: Any) -> None:
-        self.sgd(sample, **kwargs)
+            if history:
+                _log_history()
+            q = new_q
+
+        if history:
+            _log_history()
+            return np.array(train_history), np.array(test_history)
+
+    def _fit_impl(
+        self, ds: DataSet, history: bool = False, **kwargs: Any
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        return self.sgd(ds, history=history, **kwargs)
     
     def predict(self, sample: DataSample) -> np.ndarray:
         return np.array([1 if y_pred >= 0 else -1 for y_pred in self._weights @ sample.X_1.T])
