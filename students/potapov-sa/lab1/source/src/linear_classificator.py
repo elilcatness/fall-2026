@@ -2,6 +2,7 @@ from typing import Optional, Literal, Any
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 from .model import Model
 from .dataset import DataSample, DataSet
@@ -20,8 +21,6 @@ class LinearClassificator(Model):
             init_weights_method: Literal['random', 'corr'] = 'random',
             corr_sample: Optional[DataSample] = None,
             object_selection_method: Literal['shuffling', 'unsure_first'] = 'unsure_first',
-            # learning_rate: float = 0.001,
-            learning_rate: float = 10e-5,
             sgd_forgetting_rate: float = 0.5,
             nag_rate: float = 10e-3,
             regularization_rate: float = 10e-3,
@@ -35,12 +34,9 @@ class LinearClassificator(Model):
             self._init_weights(init_weights_method, corr_sample=corr_sample)
         )
         self.object_selection_method = object_selection_method
-        if learning_rate <= 0:
-            raise InitializationException('Learning rate should be positive')
-        self.lr = learning_rate
         self.lmbd = sgd_forgetting_rate
         self.gamma = nag_rate
-        self.tao = regularization_rate
+        self.tau = regularization_rate
         self.epsilon = epsilon
 
         self.target_classes = [-1, 1]
@@ -82,27 +78,25 @@ class LinearClassificator(Model):
         index = np.random.choice(sorted_margins.index.to_numpy(), size=size, p=sorted_margins_proba)
         return index
 
-    def loss(self, X: np.ndarray, Y: np.ndarray, weights: Optional[np.ndarray] = None) -> np.ndarray:
-        return (1 - self.calc_margins(X, Y, weights=weights)) ** 2
+    def loss(
+        self, X: np.ndarray, Y: np.ndarray, weights: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+        w = weights if weights is not None else self._weights
+        return (1 - self.calc_margins(X, Y, weights=w)) ** 2 + self.tau / 2 * np.sum(
+            w[:-1] ** 2
+        )
+
+    def loss_grad(
+        self, X: np.ndarray, Y: np.ndarray, weights: Optional[np.ndarray] = None
+    ) -> np.ndarray:
+       w = weights if weights is not None else self._weights
+       tau_w = np.concat([self.tau * w[:-1], np.array([0])])
+       return (-2 * Y * (1 - self.calc_margins(X, Y))) @ X + tau_w
+
 
     @staticmethod
     def loss_margin(m: np.ndarray) -> np.ndarray:
         return (1 - m) ** 2
-
-    def gradient_descent(self, sample: DataSample):
-        X, Y = sample.X_1.to_numpy(), sample.Y.to_numpy()
-        
-        q = np.sum(self.loss(X, Y))
-        delta_q = float('inf')
-
-        while delta_q > self.epsilon:
-            m = self.calc_margins(X, Y)
-            grad = (-2 * Y * (1 - m) / X.shape[0]) @ X
-            self._weights = self._weights * (1 - self.lr * self.tao) - self.lr * grad
-
-            new_q = np.sum(self.loss(X, Y))
-            delta_q = abs(q - new_q)
-            q = new_q
 
     @staticmethod
     def _get_subsample(sample: DataSample, frac: float = 0.1) -> tuple[np.ndarray, np.ndarray]:
@@ -112,13 +106,29 @@ class LinearClassificator(Model):
         sub_Y.reset_index()
         return sub_X.to_numpy(), sub_Y.to_numpy()
 
+    def _find_steepest_step(
+        self, v: np.ndarray, x: np.ndarray, y: np.ndarray
+    ) -> np.float64:
+        w = self._weights
+        res = minimize(
+            lambda h: self.loss(
+                x,
+                y,
+                w - h * (
+                    self.gamma * v
+                    + (1 - self.gamma) * self.loss_grad(x, y, w - h * self.gamma * v)
+                ),
+            ),
+            x0=[0],
+            bounds=[(0, None)],
+        )
+        return res.x[0]
+
     def update_weights_nag(self, v: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        h = 1 / np.sum(x ** 2) ** 2 # steepest decent
-        nag_weights = self._weights - h * self.gamma * v
-        m = self.calc_margins(x, y, weights=nag_weights)
-        grad = (-2 * y * (1 - m)) @ x
+        h = self._find_steepest_step(v, x, y)
+        grad = self.loss_grad(x, y, self._weights - h * self.gamma * v)
         v = self.gamma * v + (1 - self.gamma) * grad
-        self._weights = self._weights * (1 - h * self.tao) - h * v
+        self._weights -= h * v
         return v
 
     def select_object(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -147,13 +157,15 @@ class LinearClassificator(Model):
 
         q = np.mean(self.loss(*self._get_subsample(ds.train)))
         delta_q = float('inf')
+        delta_w = float('inf')
 
         # NAG
         v = np.zeros(self.feature_count)
 
         train_history: list[np.float64] = []
-        test_history: list[np.float64] = [] 
-        while delta_q > self.epsilon:
+        test_history: list[np.float64] = []
+        while delta_q > self.epsilon and delta_w > self.epsilon:
+            old_weights = self._weights.copy()
             x, y = self.select_object(X_train, Y_train)
 
             m = self.calc_margins(x, y)
@@ -163,6 +175,8 @@ class LinearClassificator(Model):
 
             new_q = (self.lmbd * xi + (1 - self.lmbd) * q)[0] # new_q is a scalar
             delta_q = abs(q - new_q)
+
+            delta_w = abs(np.sqrt(np.sum(self._weights ** 2)) - np.sqrt(np.sum(old_weights ** 2)))
 
             if history:
                 _log_history()

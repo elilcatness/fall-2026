@@ -103,11 +103,25 @@ L(x,w) = \left( 1 - y * \langle w,x \rangle \right)^2 \\\space\\
 Итоговая формула градиента:
 $$ \nabla L(x,w) = \left[ -2y(1-M)x_0, -2y(1-M)x_1, ..., -2y(1-M)x_n \right] \\\space\\ \nabla L(x,w) = \left[ -2y(1-M)x_i \right] $$
 
+При введении L2-регуляризации (с коэффициентом регуляризации $\tau$):
+
+- Функция потерь примет вид:
+$$ \tilde{L}(x,w)=\left(1-y*\langle w,x \rangle\right)^2+\frac{\tau}{2}\sum_{j=1}^{n}w_j^2 $$
+
+- Градиент функции потерь примет вид:
+$$ \nabla \tilde{L}(x,w)=(-2y(1-M))x+\tau w $$
+
+
 <hr>
 
-В коде градиент рассчитывается в следующем месте: [src/linear_classificator.py:117](source/src/linear_classificator.py#L117)
+В коде градиент рассчитывается в следующем месте: [src/linear_classificator.py:89](source/src/linear_classificator.py#L89)
 ```py
-grad = (-2 * y * (1 - m)) @ x
+def loss_grad(
+        self, X: np.ndarray, Y: np.ndarray, weights: Optional[np.ndarray] = None
+) -> np.ndarray:
+    w = weights if weights is not None else self._weights
+    tau_w = np.concat([self.tau * w[:-1], np.array([0])])
+    return (-2 * Y * (1 - self.calc_margins(X, Y))) @ X + tau_w
 ```
 
 ## 4. Реализация рекуррентной оценки функционала качества
@@ -122,19 +136,19 @@ $$
 - $\xi_m = L(w,x_i)$ - значение функции потерь на $x_i$
 - $\lambda$ - коэффициент забывания
 
-Рекуррентная оценка функционала качества реализована следующим образом: [src/linear_classificator.py:155](source/src/linear_classificator.py#L155)
+Рекуррентная оценка функционала качества реализована следующим образом: [src/linear_classificator.py:176](source/src/linear_classificator.py#L176)
 ```py
-new_q = self.lmbd * xi + (1 - self.lmbd) * q
+new_q = (self.lmbd * xi + (1 - self.lmbd) * q)[0]
 ```
 
 ## 5. Реализация метода стохастического градиентного спуска с инерцией
 
 **Алгоритм SGD**
 
-Вход: выборка $X^l$, темп обучения h, темп забывания \lambda
-Выход: вектор весов $w$
+- **Вход:** выборка $X^l$, темп обучения $h$, темп забывания $\lambda$
+- **Выход:** вектор весов $w$
 
-1. Инициализировать веса $w_j$, $j=0,...,n$ ([src/linear_classificator.py:54](source/src/linear_classificator.py#L54)):
+1. Инициализировать веса $w_j$, $j=0,...,n$ ([src/linear_classificator.py:52](source/src/linear_classificator.py#52)):
 ```py
 def _init_weights(self, method: str, corr_sample: Optional[DataSample] = None) -> np.ndarray:
     if method == 'random':
@@ -158,32 +172,32 @@ def _init_weights(self, method: str, corr_sample: Optional[DataSample] = None) -
 2. Инициализировать оценку функционала:
 $$ Q := \text{среднее} \space L(w,x_i) \space \text{по случайному подмножеству} \space {x_i} $$
 
-([src/linear_classificator.py:138](source/src/linear_classificator.py#L138))
+([src/linear_classificator.py:158](source/src/linear_classificator.py#L158))
 ```py
-q = np.mean(self.loss(*self._get_subsample(sample)))
+q = np.mean(self.loss(*self._get_subsample(ds.train)))
 ```
 
 3. (повторять)
-- 4. выбрать объект $x_i$ из $X^l$ случайным образом ([src/linear_classificator.py:148](source/src/linear_classificator.py#L148))
+- 4. выбрать объект $x_i$ из $X^l$ случайным образом ([src/linear_classificator.py:169](source/src/linear_classificator.py#L169))
 ```py
-    x, y = self.select_object(X, Y)
+    x, y = self.select_object(X_train, Y_train)
 ```
-- 5. вычислить потерю $\xi_i := L(w,x_i)$ ([src/linear_classificator.py:150](source/src/linear_classificator.py#L150))
+- 5. вычислить потерю $\xi_i := L(w,x_i)$ ([src/linear_classificator.py:171](source/src/linear_classificator.py#L171))
 ```py
     m = self.calc_margins(x, y)
     xi = self.loss_margin(m)
 ```
-- 6. сделать градиентный шаг: $w := w - h \nabla L(w,x_i)$ ([src/linear_classificator.py:119](source/src/linear_classificator.py#L119))
+- 6. сделать градиентный шаг: $w := w - h \nabla L(w,x_i)$ ([src/linear_classificator.py:131](source/src/linear_classificator.py#L131))
 ```py
-    self._weights = self._weights * (1 - h * self.tao) - h * v
+    self._weights -= h * v
 ```
-- 7. оценить функционал: $Q := \lambda\xi_i + (1-\lambda)Q$ ([src/linear_classificator.py:155](source/src/linear_classificator.py#L155))
+- 7. оценить функционал: $Q := \lambda\xi_i + (1-\lambda)Q$ ([src/linear_classificator.py:176](source/src/linear_classificator.py#L176))
 ```py
-    new_q = self.lmbd * xi + (1 - self.lmbd) * q
+    new_q = (self.lmbd * xi + (1 - self.lmbd) * q)[0] # new_q is a scalar
 ```
-8. (пока) значение $Q$ и/или веса $w$ не сойдутся ([src/linear_classificator.py:145](source/src/linear_classificator.py#L145))
+8. (пока) значение $Q$ и/или веса $w$ не сойдутся ([src/linear_classificator.py:167](source/src/linear_classificator.py#L167))
 ```py
-while delta_q > self.epsilon:
+while delta_q > self.epsilon and delta_w > self.epsilon:
 ```
 
 **Инерция**
@@ -193,15 +207,13 @@ v := \gamma v + (1-\gamma)L'(w-h\gamma v,x_i) \\\space\\
 w := w - hv
 $$
 
-Реализация в коде ([src/linear_classificator.py:113](source/src/linear_classificator.py#L113)):
+Реализация в коде ([src/linear_classificator.py:127](source/src/linear_classificator.py#L127)):
 ```py
 def update_weights_nag(self, v: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    h = 1 / np.sum(x ** 2) ** 2 # steepest decent
-    nag_weights = self._weights - h * self.gamma * v
-    m = self.calc_margins(x, y, weights=nag_weights)
-    grad = (-2 * y * (1 - m)) @ x
-    v = (self.gamma * v + (1 - self.gamma) * grad)
-    self._weights = self._weights * (1 - h * self.tao) - h * v
+    h = self._find_steepest_step(v, x, y)
+    grad = self.loss_grad(x, y, self._weights - h * self.gamma * v)
+    v = self.gamma * v + (1 - self.gamma) * grad
+    self._weights -= h * v
     return v
 ```
 
@@ -215,13 +227,7 @@ $$ \tilde{L}(w,x_i)=L(w,x_i)+\frac{\tau}{2} ||x||^2 = L(w,x_i)+\frac{\tau}{2}\su
 
 $$ \nabla\tilde{L}(w,x_i)=\nabla L(w,x_i) + \tau w $$
 
-Модификация градиентного шага:
-$$ w:= w(1-h\tau) - h\nabla L(w,x_i) $$
-
-Реализация в коде ([src/linear_classificator.py:119](source/src/linear_classificator.py#L119)):
-```py
-self._weights = self._weights * (1 - h * self.tao) - h * v
-```
+Реализация в коде ([src/linear_classificator.py:89](source/src/linear_classificator.py#L89)).
 
 ## 7. Реализация скорейшего градиентного спуска
 
@@ -229,11 +235,29 @@ self._weights = self._weights * (1 - h * self.tao) - h * v
 
 $$ L(w-h\nabla L(w,x_i),x_i) \to \min_h $$
 
-При квадратичной функции потерь $h^* = ||x_i||^{-2}$
+Для нахождения оптимального шага в направлении антиградиента была выполнена задача одномерной оптимизации с помощью `scipy.optimize.minimze`. В минимизируемом функционале было учтено добавление инерции и L2-регуляризации в процесс обучения:
 
-Реализация в коде ([src/linear_classificator.py:114](source/src/linear_classificator.py#L114)):
+$$ h^* = \arg\min_{h\ge0}\tilde{L}(w-h[\gamma v+(1-\gamma)\nabla\tilde{L}(w-h\gamma v,x_i)],x_i) $$
+
+Реализация в коде ([src/linear_classificator.py:109](source/src/linear_classificator.py#L109)):
 ```py
-h = 1 / np.sum(x ** 2) ** 2
+def _find_steepest_step(
+        self, v: np.ndarray, x: np.ndarray, y: np.ndarray
+) -> np.float64:
+    w = self._weights
+    res = minimize(
+        lambda h: self.loss(
+            x,
+            y,
+            w - h * (
+                self.gamma * v
+                + (1 - self.gamma) * self.loss_grad(x, y, w - h * self.gamma * v)
+            ),
+        ),
+        x0=[0],
+        bounds=[(0, None)],
+    )
+    return res.x[0]
 ```
 
 ## 8. Реализация предъявления объектов по модулю отступа
@@ -243,12 +267,12 @@ h = 1 / np.sum(x ** 2) ** 2
 чем меньше $|M_i|$, тем больше вероятность взять объект.
 
 Реализация в коде:
-1. [src/linear_classificator.py:128](source/src/linear_classificator.py#L128)
+1. [src/linear_classificator.py:140](source/src/linear_classificator.py#L140)
 ```py
 elif self.object_selection_method == 'unsure_first':
     batch_rand_idx = self.get_sorted_abs_margins_indices_sample(X, Y)
 ```
-2. [src/linear_classificator.py:77](source/src/linear_classificator.py#L77)
+2. [src/linear_classificator.py:75](source/src/linear_classificator.py#L75)
 ```py
 def get_sorted_abs_margins_indices_sample(self, X: np.ndarray, Y: np.ndarray, size: int = 1) -> np.ndarray:
     sorted_margins = pd.Series(np.abs(self.calc_margins(X, Y))).sort_values()
@@ -256,7 +280,7 @@ def get_sorted_abs_margins_indices_sample(self, X: np.ndarray, Y: np.ndarray, si
     index = np.random.choice(sorted_margins.index.to_numpy(), size=size, p=sorted_margins_proba)
     return index
 ```
-3. [src/linear_classificator.py:72](source/src/linear_classificator.py#L72)
+3. [src/linear_classificator.py:70](source/src/linear_classificator.py#L70)
 ```py
 @staticmethod
 def softmin(x: np.ndarray) -> np.ndarray:
@@ -282,7 +306,7 @@ $f_j=\left( f_j(x_i) \right)_{i=1}^l$ - вектор значений призн
 1. функция потерь квадратичная
 2. признаки некоррелированы, $\langle f_j,f_k \rangle = 0, j \ne k$
 
-Реализация в коде ([src/linear_classificator.py:61](source/src/linear_classificator.py#L61)):
+Реализация в коде ([src/linear_classificator.py:59](source/src/linear_classificator.py#L59)):
 ```py
 if method == 'corr':
     if corr_sample is None:
@@ -297,7 +321,7 @@ if method == 'corr':
 
 **Обучение модели и её метрики**
 
-Реализация в коде ([main.py:13](source/main.py#L13)):
+Реализация в коде ([main.py:14](source/main.py#L14)):
 
 ```py
 def solution_corr(
@@ -310,10 +334,11 @@ def solution_corr(
         init_weights_method='corr',
         corr_sample=ds.train
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'corr')
+        plot_loss_history(model)
     return model, ds.test
 ```
 
@@ -321,8 +346,8 @@ def solution_corr(
 ```plaintext
 corr metrics:
        Accuracy  Precision    Recall
-train  0.758621   0.850746  0.695122
-test   0.854839   0.916667  0.758621
+train  0.744828   0.933333  0.552632
+test   0.854839   0.964286  0.771429
 ```
 
 **График функции потерь на `train` и `test`**
@@ -336,7 +361,7 @@ test   0.854839   0.916667  0.758621
 
 **Реализация в коде**:
 
-1. Случайная инициализация весов ([src/linear_classificator.py:55](source/src/linear_classificator.py#L55)):
+1. Случайная инициализация весов ([src/linear_classificator.py:53](source/src/linear_classificator.py#L53)):
 ```py
 if method == 'random':
     return np.random.uniform(
@@ -345,7 +370,7 @@ if method == 'random':
         self.feature_count
     )
 ```
-2. Обучение ([main.py:30](source/main.py#L30)):
+2. Обучение ([main.py:32](source/main.py#L32)):
 ```py
 def solution_multistart(
         starts: int = 10,
@@ -359,7 +384,7 @@ def solution_multistart(
             name='multistart',
             init_weights_method='random'
         )
-        model.fit(ds.train)
+        model.fit(ds)
         model.evaluate(ds.test)
         if (
             best_model is None or
@@ -368,6 +393,7 @@ def solution_multistart(
             best_model, best_model_ds = model, ds
     if plot:
         plot_margins(best_model, best_model_ds.test, 'multistart') # type: ignore
+        plot_loss_history(best_model) # type: ignore
     return best_model, best_model_ds.test # type: ignore
 ```
 
@@ -376,8 +402,8 @@ def solution_multistart(
 ```plaintext
 multistart metrics:
        Accuracy  Precision    Recall
-train  0.793103   0.809524  0.829268
-test   0.903226   0.925926  0.862069
+train  0.855172   0.837500  0.893333
+test   0.870968   0.868421  0.916667
 ```
 
 **График функции потерь на `train` и `test`**
@@ -390,7 +416,7 @@ test   0.903226   0.925926  0.862069
 
 Реализация в коде:
 
-1. Реализация случайного предъявления объектов ([src/linear_classificator.py:123](source/src/linear_classificator.py#L123)):
+1. Реализация случайного предъявления объектов ([src/linear_classificator.py:135](source/src/linear_classificator.py#L135)):
 ```py
 if self.object_selection_method == 'shuffling':
     cls = self.target_classes[self.shuffling_i]
@@ -398,7 +424,7 @@ if self.object_selection_method == 'shuffling':
     self.shuffling_i = (self.shuffling_i + 1) % len(self.target_classes)
     batch_rand_idx = Y_[Y_ == cls].sample(1).index.to_numpy()
 ```
-2. Обучение ([main.py:54](source/main.py#L54)):
+2. Обучение ([main.py:57](source/main.py#L57)):
 ```py
 def solution_shuffling(
         ds: DataSet, 
@@ -409,10 +435,11 @@ def solution_shuffling(
         name='shuffling',
         object_selection_method='shuffling'
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'shuffling')
+        plot_loss_history(model)
     return model, ds.test
 ```
 
@@ -421,8 +448,8 @@ def solution_shuffling(
 ```plaintext
 shuffling metrics:
        Accuracy  Precision    Recall
-train  0.813793   0.772727  0.906667
-test   0.854839   0.885714  0.861111
+train  0.820690   0.747368  0.972603
+test   0.822581   0.800000  0.947368
 ```
 
 **График функции потерь на `train` и `test`**
@@ -433,7 +460,7 @@ test   0.854839   0.885714  0.861111
 
 см. [п. 8. Реализация предъявления объектов по модулю отступа](#8-реализация-предъявления-объектов-по-модулю-отступа)
 
-Реализация в коде ([main.py:70](source/main.py#L70)):
+Реализация в коде ([main.py:74](source/main.py#L74)):
 ```py
 def solution_unsure_margin(
         ds: DataSet, 
@@ -444,10 +471,11 @@ def solution_unsure_margin(
         name='unsure_margin',
         object_selection_method='unsure_first'
     )
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'unsure_margin.png')
+        plot_loss_history(model)
     return model, ds.test
 ```
 
@@ -455,8 +483,8 @@ def solution_unsure_margin(
 ```plaintext
 unsure_margin metrics:
        Accuracy  Precision    Recall
-train  0.882759   0.862500  0.920000
-test   0.854839   0.935484  0.805556
+train  0.751724   0.822581  0.671053
+test   0.806452   0.896552  0.742857
 ```
 
 **График функции потерь на `train` и `test`**
@@ -469,14 +497,14 @@ test   0.854839   0.935484  0.805556
 - loss='squared_hinge'
 - penalty='l2'
 
-Реализация в коде ([main.py:86](source/main.py#L86)):
+Реализация в коде ([main.py:91](source/main.py#L91)):
 ```py
 def solution_reference(
         ds: DataSet, 
         plot: bool = False
 ) -> tuple[ReferenceSGDClassifier, DataSample]:
     model = ReferenceSGDClassifier(name='ref')
-    model.fit(ds.train)
+    model.fit(ds)
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'ref')
@@ -487,8 +515,8 @@ def solution_reference(
 ```plaintext
 ref metrics:
        Accuracy  Precision    Recall
-train  0.868966   0.858974  0.893333
-test   0.870968   0.937500  0.833333
+train  0.868966   1.000000  0.756410
+test   0.838710   0.810811  0.909091
 ```
 
 **График функции потерь на `train` и `test`**
@@ -501,19 +529,19 @@ test   0.870968   0.937500  0.833333
 ```plaintext
 Best metrics:
                Accuracy  Precision    Recall
-multistart     0.903226   0.925926  0.862069
-ref            0.870968   0.937500  0.833333
-corr           0.854839   0.916667  0.758621
-shuffling      0.854839   0.885714  0.861111
-unsure_margin  0.854839   0.935484  0.805556
+multistart     0.870968   0.868421  0.916667
+corr           0.854839   0.964286  0.771429
+ref            0.838710   0.810811  0.909091
+shuffling      0.822581   0.800000  0.947368
+unsure_margin  0.806452   0.896552  0.742857
 ```
 
-Таким образом, из самописных реализаций лучшей оказалась модель с инициализацией весов через корреляцию (`multstart`).
+Таким образом, из лучшей реализацией оказалась модель, полученная с помощью мультистарта (`multistart`).
 
 ## 11. Сравнение лучшей реализации с эталонной
 
-По `accuracy` и `recall` самописная реализация `multistart` оказалась лучше эталонной реализации `ref`:
+По всем метрикам лучшая самописная реализация `multistart` оказалась лучше эталонной реализации `ref`:
 
-- По `accuracy`: самописная на 3.7% лучше эталонной
-- По `precision`: эталонная на 1.2% лучше самописной
-- По `recall`: самописная на 3.4% лучше эталонной
+- По `accuracy`: самописная на 3.8% лучше эталонной
+- По `precision`: эталонная на 7.1% лучше самописной
+- По `recall`: самописная на 0.8% лучше эталонной

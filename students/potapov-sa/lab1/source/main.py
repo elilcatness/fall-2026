@@ -50,6 +50,7 @@ def solution_multistart(
             best_model, best_model_ds = model, ds
     if plot:
         plot_margins(best_model, best_model_ds.test, 'multistart') # type: ignore
+        plot_loss_history(best_model) # type: ignore
     return best_model, best_model_ds.test # type: ignore
 
 
@@ -66,6 +67,7 @@ def solution_shuffling(
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'shuffling')
+        plot_loss_history(model)
     return model, ds.test
 
 
@@ -82,6 +84,7 @@ def solution_unsure_margin(
     model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'unsure_margin.png')
+        plot_loss_history(model)
     return model, ds.test
 
 
@@ -124,7 +127,7 @@ def print_models_metrics(*models: Model) -> None:
 
 
 def main():
-    N = 1
+    N = 100
     print(f'N = {N}')
 
     best_models: dict[

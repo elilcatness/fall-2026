@@ -1,37 +1,37 @@
-RANDOM_STATE=49346
+RANDOM_STATE=61772
 
 N = 100
 100/100
 
 Best metrics:
                Accuracy  Precision    Recall
-multistart     0.903226   0.925926  0.862069
-ref            0.870968   0.937500  0.833333
-corr           0.854839   0.916667  0.758621
-shuffling      0.854839   0.885714  0.861111
-unsure_margin  0.854839   0.935484  0.805556
+multistart     0.870968   0.868421  0.916667
+corr           0.854839   0.964286  0.771429
+ref            0.838710   0.810811  0.909091
+shuffling      0.822581   0.800000  0.947368
+unsure_margin  0.806452   0.896552  0.742857
 
 corr metrics:
        Accuracy  Precision    Recall
-train  0.758621   0.850746  0.695122
-test   0.854839   0.916667  0.758621
+train  0.744828   0.933333  0.552632
+test   0.854839   0.964286  0.771429
 
 multistart metrics:
        Accuracy  Precision    Recall
-train  0.793103   0.809524  0.829268
-test   0.903226   0.925926  0.862069
+train  0.855172   0.837500  0.893333
+test   0.870968   0.868421  0.916667
 
 shuffling metrics:
        Accuracy  Precision    Recall
-train  0.813793   0.772727  0.906667
-test   0.854839   0.885714  0.861111
+train  0.820690   0.747368  0.972603
+test   0.822581   0.800000  0.947368
 
 unsure_margin metrics:
        Accuracy  Precision    Recall
-train  0.882759   0.862500  0.920000
-test   0.854839   0.935484  0.805556
+train  0.751724   0.822581  0.671053
+test   0.806452   0.896552  0.742857
 
 ref metrics:
        Accuracy  Precision    Recall
-train  0.868966   0.858974  0.893333
-test   0.870968   0.937500  0.833333
+train  0.868966   1.000000  0.756410
+test   0.838710   0.810811  0.909091
