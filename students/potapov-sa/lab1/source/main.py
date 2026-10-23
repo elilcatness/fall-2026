@@ -33,7 +33,7 @@ def solution_multistart(
         starts: int = 10,
         plot: bool = False
 ) -> LinearClassificator:
-    best_model, best_model_ds = None, None
+    best_model = None
     for _ in range(starts):
         model = LinearClassificator(
             ds.feature_count,
@@ -45,9 +45,9 @@ def solution_multistart(
             best_model is None or
             model.metrics.train.accuracy > best_model.metrics.train.accuracy # type: ignore
         ):
-            best_model, best_model_ds = model, ds
+            best_model = model
     if plot:
-        plot_margins(best_model, best_model_ds.test, 'multistart') # type: ignore
+        plot_margins(best_model, ds.test, 'multistart') # type: ignore
         plot_loss_history(best_model) # type: ignore
     return best_model  # type: ignore
 
