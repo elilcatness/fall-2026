@@ -121,7 +121,7 @@ def loss_grad(
 ) -> np.ndarray:
     w = weights if weights is not None else self._weights
     tau_w = np.concat([self.tau * w[:-1], np.array([0])])
-    return (-2 * Y * (1 - self.calc_margins(X, Y))) @ X + tau_w
+    return (-2 * Y * (1 - self.calc_margins(X, Y, w))) @ X + tau_w
 ```
 
 ## 4. Реализация рекуррентной оценки функционала качества
@@ -327,7 +327,7 @@ if method == 'corr':
 def solution_corr(
         ds: DataSet,
         plot: bool = False
-) -> tuple[LinearClassificator, DataSample]:
+) -> LinearClassificator:
     model = LinearClassificator(
         ds.feature_count,
         name='corr',
@@ -335,19 +335,17 @@ def solution_corr(
         corr_sample=ds.train
     )
     model.fit(ds)
-    model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'corr')
         plot_loss_history(model)
-    return model, ds.test
+    return model
 ```
 
-Метрики на обучающей и тестовой выборках:
+**Метрики на обучающей выборке**
+
 ```plaintext
-corr metrics:
-       Accuracy  Precision    Recall
-train  0.744828   0.933333  0.552632
-test   0.854839   0.964286  0.771429
+Accuracy  Precision    Recall
+0.875862   0.844444  0.950000
 ```
 
 **График функции потерь на `train` и `test`**
@@ -370,40 +368,37 @@ if method == 'random':
         self.feature_count
     )
 ```
-2. Обучение ([main.py:32](source/main.py#L32)):
+2. Обучение ([main.py:31](source/main.py#L31)):
 ```py
 def solution_multistart(
+        ds: DataSet,
         starts: int = 10,
         plot: bool = False
-) -> tuple[LinearClassificator, DataSample]:
+) -> LinearClassificator:
     best_model, best_model_ds = None, None
     for _ in range(starts):
-        ds = DataSet()
         model = LinearClassificator(
             ds.feature_count,
             name='multistart',
             init_weights_method='random'
         )
         model.fit(ds)
-        model.evaluate(ds.test)
         if (
             best_model is None or
-            model.metrics.test.accuracy > best_model.metrics.test.accuracy # type: ignore
+            model.metrics.train.accuracy > best_model.metrics.train.accuracy # type: ignore
         ):
             best_model, best_model_ds = model, ds
     if plot:
         plot_margins(best_model, best_model_ds.test, 'multistart') # type: ignore
         plot_loss_history(best_model) # type: ignore
-    return best_model, best_model_ds.test # type: ignore
+    return best_model  # type: ignore
 ```
 
-**Метрики**
+**Метрики на обучающей выборке**
 
 ```plaintext
-multistart metrics:
-       Accuracy  Precision    Recall
-train  0.855172   0.837500  0.893333
-test   0.870968   0.868421  0.916667
+Accuracy  Precision    Recall
+0.882759   0.867470  0.923077
 ```
 
 **График функции потерь на `train` и `test`**
@@ -424,32 +419,29 @@ if self.object_selection_method == 'shuffling':
     self.shuffling_i = (self.shuffling_i + 1) % len(self.target_classes)
     batch_rand_idx = Y_[Y_ == cls].sample(1).index.to_numpy()
 ```
-2. Обучение ([main.py:57](source/main.py#L57)):
+2. Обучение ([main.py:55](source/main.py#L55)):
 ```py
 def solution_shuffling(
         ds: DataSet, 
         plot: bool = False
-) -> tuple[LinearClassificator, DataSample]:
+) -> LinearClassificator:
     model = LinearClassificator(
         ds.feature_count,
         name='shuffling',
         object_selection_method='shuffling'
     )
     model.fit(ds)
-    model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'shuffling')
         plot_loss_history(model)
-    return model, ds.test
+    return model
 ```
 
-**Метрики**
+**Метрики на обучающей выборке**
 
 ```plaintext
-shuffling metrics:
-       Accuracy  Precision    Recall
-train  0.820690   0.747368  0.972603
-test   0.822581   0.800000  0.947368
+Accuracy  Precision    Recall
+0.896552   0.896104  0.907895
 ```
 
 **График функции потерь на `train` и `test`**
@@ -460,31 +452,29 @@ test   0.822581   0.800000  0.947368
 
 см. [п. 8. Реализация предъявления объектов по модулю отступа](#8-реализация-предъявления-объектов-по-модулю-отступа)
 
-Реализация в коде ([main.py:74](source/main.py#L74)):
+Реализация в коде ([main.py:71](source/main.py#L71)):
 ```py
 def solution_unsure_margin(
         ds: DataSet, 
         plot: bool = False
-) -> tuple[LinearClassificator, DataSample]:
+) -> LinearClassificator:
     model = LinearClassificator(
         ds.feature_count,
         name='unsure_margin',
         object_selection_method='unsure_first'
     )
     model.fit(ds)
-    model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'unsure_margin.png')
         plot_loss_history(model)
-    return model, ds.test
+    return model
 ```
 
-**Метрики**
+**Метрики на обучающей выборке**
+
 ```plaintext
-unsure_margin metrics:
-       Accuracy  Precision    Recall
-train  0.751724   0.822581  0.671053
-test   0.806452   0.896552  0.742857
+Accuracy  Precision    Recall
+0.910345   0.867470  0.972973
 ```
 
 **График функции потерь на `train` и `test`**
@@ -497,26 +487,24 @@ test   0.806452   0.896552  0.742857
 - loss='squared_hinge'
 - penalty='l2'
 
-Реализация в коде ([main.py:91](source/main.py#L91)):
+Реализация в коде ([main.py:87](source/main.py#L87)):
 ```py
 def solution_reference(
         ds: DataSet, 
         plot: bool = False
-) -> tuple[ReferenceSGDClassifier, DataSample]:
+) -> ReferenceSGDClassifier:
     model = ReferenceSGDClassifier(name='ref')
     model.fit(ds)
-    model.evaluate(ds.test)
     if plot:
         plot_margins(model, ds.test, 'ref')
-    return model, ds.test
+    return model
 ```
 
-**Метрики**
+**Метрики на обучающей выборке**
+
 ```plaintext
-ref metrics:
-       Accuracy  Precision    Recall
-train  0.868966   1.000000  0.756410
-test   0.838710   0.810811  0.909091
+Accuracy  Precision    Recall
+0.965517   0.986667  0.948718
 ```
 
 **График функции потерь на `train` и `test`**
@@ -529,19 +517,38 @@ test   0.838710   0.810811  0.909091
 ```plaintext
 Best metrics:
                Accuracy  Precision    Recall
-multistart     0.870968   0.868421  0.916667
-corr           0.854839   0.964286  0.771429
-ref            0.838710   0.810811  0.909091
-shuffling      0.822581   0.800000  0.947368
-unsure_margin  0.806452   0.896552  0.742857
+ref            0.965517   0.986667  0.948718
+unsure_margin  0.910345   0.867470  0.972973
+shuffling      0.896552   0.896104  0.907895
+multistart     0.882759   0.867470  0.923077
+corr           0.875862   0.844444  0.950000
 ```
 
-Таким образом, из лучшей реализацией оказалась модель, полученная с помощью мультистарта (`multistart`).
+Таким образом, лучшей самописной реализацией (по обучающей выборке `train`) оказалась модель с предъявлением по модулю отступа (`unsure_margin`).
 
 ## 11. Сравнение лучшей реализации с эталонной
 
-По всем метрикам лучшая самописная реализация `multistart` оказалась лучше эталонной реализации `ref`:
+```plaintext
+Best custom model is: unsure_margin
 
-- По `accuracy`: самописная на 3.8% лучше эталонной
-- По `precision`: эталонная на 7.1% лучше самописной
-- По `recall`: самописная на 0.8% лучше эталонной
+unsure_margin metrics:
+       Accuracy  Precision    Recall
+train  0.910345   0.867470  0.972973
+test   0.758065   0.729167  0.945946
+
+ref metrics:
+       Accuracy  Precision    Recall
+train  0.965517   0.986667  0.948718
+test   0.741935   0.688889  0.939394
+
+test metrics comp:
+               Accuracy  Precision    Recall
+unsure_margin  0.758065   0.729167  0.945946
+ref            0.741935   0.688889  0.939394
+```
+
+По всем метрикам (на тестовой выборке `test`) лучшая самописная реализация `unsure_margin` оказалась лучше эталонной реализации `ref`:
+
+- По `accuracy`: на 2.2%
+- По `precision`: на 5.8%
+- По `recall`: на 0.7%
