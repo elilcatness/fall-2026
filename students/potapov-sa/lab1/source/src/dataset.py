@@ -50,6 +50,7 @@ class DataSet(PandasWrapper):
         self._df = self._prepare_dataset(target)
         self.train, self.test = self._train_test_split(target, ratio=train_test_ratio)
 
+
     @staticmethod
     def _load_dataset() -> pd.DataFrame:
         return load_dataset(
@@ -70,10 +71,24 @@ class DataSet(PandasWrapper):
         test_sample = self._df.drop(train_sample.index)
         train_sample.reset_index(drop=True)
         test_sample.reset_index(drop=True)
+        train_sample, test_sample = self._scale_samples(train_sample, test_sample, target)
         return (
             DataSample(train_sample, target, dataset_name=self.name, type_='train'),
             DataSample(test_sample, target, dataset_name=self.name, type_='test')
         )
+
+    def _scale_samples(
+        self, train: pd.DataFrame, test: pd.DataFrame, *ignore: str
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        assert (train.columns == test.columns).all()
+        for col in train.columns:
+            if col in ignore:
+                continue
+            train_min = train[col].min()
+            train_max = train[col].max()
+            train[col] = (train[col] - train_min) / (train_max - train_min)
+            test[col] = (test[col] - train_min) / (train_max - train_min)
+        return train, test
 
     @property
     def feature_count(self) -> int:
@@ -93,7 +108,8 @@ class DataSample(PandasWrapper):
             dataset_name: Optional[str] = None
     ):
         super().__init__(type_=type_, name=dataset_name)
-        self._df = self._scale(df, target)
+        # self._df = self._scale(df, target)
+        self._df = df
         self._X = self._df.drop([target], axis=1)
         self._X_1 = self._X.copy()
         if 'dummy' in self._X_1.columns:
