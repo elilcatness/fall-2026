@@ -30,16 +30,32 @@ def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = Non
     margins = model.margins if model.margins is not None else model.calc_margins_sample(sample)
     sorted_margins: list[np.float64] = sorted(list(margins))
     plot_x = np.array([i for i in range(len(sorted_margins))])
+    unsure_range: tuple[float, float] = (-0.3, 0.5)
 
+    used_labels: set[str] = set()
     for x, m in zip(plot_x, sorted_margins):
-        if m <= -0.3:
-            color = 'r'
-        elif m >= 0.5:
-            color = 'g'
+        if m <= unsure_range[0]:
+            color, label = 'r', 'noise'
+        elif m >= unsure_range[1]:
+            color, label = 'g', 'sure'
         else:
-            color = 'y'
-        plt.plot([x, x], [m, 0], color, linewidth=0.5)
+            color, label = 'y', 'unsure'
+        if label not in used_labels:
+            used_labels.add(label)
+        else:
+            label = None
+        plt.plot([x, x], [m, 0], color, linewidth=0.5, label=label)
     plt.plot([plot_x[0], plot_x[-1]], [0, 0], 'gray')
+    
+    if 'unsure' in used_labels:
+        plt.plot(plot_x, [unsure_range[0]] * len(plot_x), color='gray', linestyle='--')
+        plt.plot(
+            plot_x,
+            [unsure_range[1]] * len(plot_x),
+            color='gray',
+            linestyle='--',
+            label=r'$unsure \in ({}, {})$'.format(*(round(x, 2) for x in unsure_range)),
+        )
 
     plt.plot(plot_x, sorted_margins)
 
@@ -52,9 +68,10 @@ def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = Non
         sorted_margins[-1] + round(m_delta * 0.05)
     ])
 
-    plt.title('Sorted margins')
+    plt.title(f'{model.name} Sorted Margins ({sample.type})')
     plt.xlabel('i')
     plt.ylabel('margin')
+    plt.legend()
 
     if filename:
         plt.savefig(_get_savefig_path(filename), dpi=_SAVE_FIG_DPI)
