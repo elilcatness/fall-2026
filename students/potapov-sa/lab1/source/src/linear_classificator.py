@@ -91,7 +91,7 @@ class LinearClassificator(Model):
     ) -> np.ndarray:
        w = weights if weights is not None else self._weights
        tau_w = np.concat([self.tau * w[:-1], np.array([0])])
-       return (-2 * Y * (1 - self.calc_margins(X, Y))) @ X + tau_w
+       return (-2 * Y * (1 - self.calc_margins(X, Y, w))) @ X + tau_w
 
 
     @staticmethod
