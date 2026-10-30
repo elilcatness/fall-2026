@@ -163,13 +163,13 @@ def main():
         
         print(f'{i}/{N}', end='\r', flush=True)
 
-    print('\n\nBest metrics:')
+    print('\n\nBest metrics (train):')
     print_models_metrics(*[model_tuple[0] for model_tuple in best_models.values()])
 
     best_custom_model, best_custom_model_test_sample = None, None
     for model, test_sample in best_models.values():
         plot_margins(model, test_sample, filename=model.name)
-        if model._loss_history_is_loggable:
+        if model.loss_history_is_loggable:
             plot_loss_history(model)
         if model.name != 'ref' and (
             best_custom_model is None

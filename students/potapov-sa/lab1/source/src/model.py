@@ -15,7 +15,6 @@ class LossHistory:
 
 
 class Model(ABC):
-    _margins: Optional[np.ndarray]
     _metrics: Metrics
     _loss_history: Optional[LossHistory]
     _loss_history_is_loggable: bool = True
@@ -23,7 +22,6 @@ class Model(ABC):
     def __init__(self, name: Optional[str] = None):
         self._name = name
         self._metrics = Metrics()
-        self._margins = None
         self._loss_history = None
 
     def calc_margins_sample(
@@ -61,7 +59,6 @@ class Model(ABC):
         return fit_res
 
     def evaluate(self, sample: DataSample) -> Metrics:
-        self._margins = self.calc_margins_sample(sample)
         self._metrics.measure(self, sample)
         return self._metrics
 
@@ -75,10 +72,6 @@ class Model(ABC):
     @property
     def name(self) -> str:
         return self._name if self._name else self.__class__.__name__
-
-    @property
-    def margins(self) -> Optional[np.ndarray]:
-        return self._margins
 
     @property
     def metrics(self) -> Metrics:

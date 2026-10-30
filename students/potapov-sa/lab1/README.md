@@ -345,7 +345,7 @@ def solution_corr(
 
 ```plaintext
 Accuracy  Precision    Recall
-0.875862   0.844444  0.950000
+0.868966   0.835165  0.950000
 ```
 
 **График функции потерь на `train` и `test`**
@@ -398,7 +398,7 @@ def solution_multistart(
 
 ```plaintext
 Accuracy  Precision    Recall
-0.882759   0.867470  0.923077
+0.889655   0.929577  0.857143
 ```
 
 **График функции потерь на `train` и `test`**
@@ -441,7 +441,7 @@ def solution_shuffling(
 
 ```plaintext
 Accuracy  Precision    Recall
-0.896552   0.896104  0.907895
+0.889655   0.855556  0.962500
 ```
 
 **График функции потерь на `train` и `test`**
@@ -474,7 +474,7 @@ def solution_unsure_margin(
 
 ```plaintext
 Accuracy  Precision    Recall
-0.910345   0.867470  0.972973
+0.848276   0.823529  0.909091
 ```
 
 **График функции потерь на `train` и `test`**
@@ -504,7 +504,7 @@ def solution_reference(
 
 ```plaintext
 Accuracy  Precision    Recall
-0.965517   0.986667  0.948718
+0.972414   0.987500  0.963415
 ```
 
 **График функции потерь на `train` и `test`**
@@ -515,40 +515,40 @@ Accuracy  Precision    Recall
 
 При числе запусков $N=100$ были получены следующие наилучшие метрики классификации (по `accuracy`) по каждой модели:
 ```plaintext
-Best metrics:
+Best metrics (train):
                Accuracy  Precision    Recall
-ref            0.965517   0.986667  0.948718
-unsure_margin  0.910345   0.867470  0.972973
-shuffling      0.896552   0.896104  0.907895
-multistart     0.882759   0.867470  0.923077
-corr           0.875862   0.844444  0.950000
+ref            0.972414   0.987500  0.963415
+multistart     0.889655   0.929577  0.857143
+shuffling      0.889655   0.855556  0.962500
+corr           0.868966   0.835165  0.950000
+unsure_margin  0.848276   0.823529  0.909091
 ```
 
-Таким образом, лучшей самописной реализацией (по обучающей выборке `train`) оказалась модель с предъявлением по модулю отступа (`unsure_margin`).
+Таким образом, лучшей самописной реализацией (по обучающей выборке `train`) оказалась модель со случайной инициализацией весов через мультистарт (`multistart`).
 
 ## 11. Сравнение лучшей реализации с эталонной
 
 ```plaintext
-Best custom model is: unsure_margin
+Best custom model is: multistart
 
-unsure_margin metrics:
+multistart metrics:
        Accuracy  Precision    Recall
-train  0.910345   0.867470  0.972973
-test   0.758065   0.729167  0.945946
+train  0.889655   0.929577  0.857143
+test   0.693548   0.727273  0.705882
 
 ref metrics:
        Accuracy  Precision    Recall
-train  0.965517   0.986667  0.948718
-test   0.741935   0.688889  0.939394
+train  0.972414     0.9875  0.963415
+test   0.725806     0.6875  0.758621
 
 test metrics comp:
                Accuracy  Precision    Recall
-unsure_margin  0.758065   0.729167  0.945946
-ref            0.741935   0.688889  0.939394
+multistart     0.693548   0.727273  0.705882
+ref            0.725806     0.6875  0.758621
 ```
 
-По всем метрикам (на тестовой выборке `test`) лучшая самописная реализация `unsure_margin` оказалась лучше эталонной реализации `ref`:
+Сравнение метрик (на тестовой выборке `test`) лучшей самописной реализации `multistart` и эталонной реализации `ref`:
 
-- По `accuracy`: на 2.2%
-- По `precision`: на 5.8%
-- По `recall`: на 0.7%
+- По `accuracy`: эталонная на 4.7% лучше самописной
+- По `precision`: самописная на 5.8% лучшей эталонной
+- По `recall`: эталонная на 7.5% лучшей самописной

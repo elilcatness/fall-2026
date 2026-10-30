@@ -27,7 +27,7 @@ def _get_savefig_path(filename: str, folder: str = 'img', ext: str = 'png') -> s
 
 
 def plot_margins(model: Model, sample: DataSample, filename: Optional[str] = None):
-    margins = model.margins if model.margins is not None else model.calc_margins_sample(sample)
+    margins = model.calc_margins_sample(sample)
     sorted_margins: list[np.float64] = sorted(list(margins))
     plot_x = np.array([i for i in range(len(sorted_margins))])
     unsure_range: tuple[float, float] = (-0.3, 0.5)
